@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChatFlow — Real-time Chat</title>
+    <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@7.1.1/bundles/stomp.umd.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
+
+        :root {
+            --bg: #f7f8fc;
+            --surface: #ffffff;
+            --surface-soft: #fbfbfd;
+            --border: #e9e9ef;
+            --border-strong: #dedee8;
+            --text: #1f2430;
+            --muted: #7f8492;
+            --muted-2: #a2a6b2;
+            --accent: #ff7356;
+            --accent-2: #ff956f;
+            --accent-soft: #fff0eb;
+            --green: #25b47b;
+            --green-soft: #eaf9f2;
+            --shadow: 0 24px 70px rgba(25, 30, 45, 0.10);
+            --shadow-soft: 0 10px 30px rgba(25, 30, 45, 0.07);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            min-height: 100vh;
+            padding: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: "DM Sans", sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(circle at 8% 8%, rgba(255, 167, 138, 0.24), transparent 22%),
+                radial-gradient(circle at 92% 88%, rgba(214, 199, 255, 0.25), transparent 22%),
+                linear-gradient(145deg, #f8f9fc 0%, #f6f7fb 50%, #faf8f7 100%);
+        }
+
+        button,
+        input {
+            font: inherit;
+        }
+
+        button {
+            cursor: pointer;
+        }
+
+        .app {
+            width: min(1220px, 100%);
+            height: min(760px, calc(100vh - 44px));
+            min-height: 620px;
+            display: flex;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,.9);
+            border-radius: 30px;
+            background: rgba(255,255,255,.88);
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(18px);
+        }
+
+        /* ================= SIDEBAR ================= */
+
+        .sidebar {
+            width: 310px;
+            flex: 0 0 310px;
+            display: flex;
+            flex-direction: column;
+            padding: 28px 22px 22px;
+            border-right: 1px solid var(--border);
+            background:
+                linear-gradient(180deg, #fffdfc 0%, #fff8f5 52%, #fffdfc 100%);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 13px;
+            padding: 0 4px;
+        }
+
+        .brand-icon {
+            width: 48px;
+            height: 48px;
+            flex-shrink: 0;
+            display: grid;
+            place-items: center;
+            border-radius: 15px;
+            color: #fff;
+            font-size: 22px;
+            background: linear-gradient(145deg, var(--accent), var(--accent-2));
+            box-shadow: 0 12px 22px rgba(255, 115, 86, .20);
+        }
+
+        .brand h1 {
+            font-family: "Plus Jakarta Sans", sans-serif;
+            font-size: 20px;
+            font-weight: 800;
+            letter-spacing: -.5px;
+        }
+
+        .brand p {
+            margin-top: 3px;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .section-title {
+            margin: 34px 5px 11px;
+            color: #aaaab4;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 1.8px;
+        }
+
+        .profile,
+        .room-card {
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,.78);
+            box-shadow: var(--shadow-soft);
+        }
+
+        .profile {
+            padding: 14px;
+            border-radius: 17px;
+        }
+
+        .profile-top {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .avatar {
+            width: 46px;
+            height: 46px;
+            flex-shrink: 0;
+            display: grid;
+            place-items: center;
+            border-radius: 14px;
+            color: #fff;
+            font-family: "Plus Jakarta Sans", sans-serif;
+            font-weight: 800;
+            font-size: 17px;
+            background: linear-gradient(145deg, #ff8f74, #ff6c52);
+        }
+
+        .profile-info {
+            min-width: 0;
+            flex: 1;
+        }
+
+        .profile-name {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-weight: 700;
+            font-size: 14px;
+        }
+
+        .online {
+            display: flex;
+            align-items: center;
+            margin-top: 5px;
+            color: var(--green);
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .online-dot {
+            width: 7px;
+            height: 7px;
+            margin-right: 6px;
+            border-radius: 50%;
+            background: var(--green);
+            box-shadow: 0 0 0 4px rgba(37,180,123,.10);
+        }
+
+        .room-card {
+            padding: 16px;
+            border-radius: 18px;
+            background:
+                linear-gradient(145deg, #fff9f6 0%, #fff 100%);
+        }
+
+        .room-icon {
+            width: 38px;
+            height: 38px;
+            display: grid;
+            place-items: center;
+            margin-bottom: 13px;
+            border-radius: 11px;
+            color: var(--accent);
+            font-weight: 800;
+            background: var(--accent-soft);
+            border: 1px solid #ffddd4;
+        }
+
+        .room-name {
+            font-family: "Plus Jakarta Sans", sans-serif;
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        .room-id {
+            margin-top: 5px;
+            color: var(--text);
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .room-description {
+            margin-top: 3px;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .edit-section {
+            margin-top: 22px;
+        }
+
+        .input-wrap {
+            position: relative;
+            margin-bottom: 10px;
+        }
+
+        .input-wrap span {
+            position: absolute;
+            top: 50%;
+            left: 13px;
+            transform: translateY(-50%);
+            color: var(--muted-2);
+            font-size: 14px;
+            pointer-events: none;
+        }
+
+        .edit-section input {
+            width: 100%;
+            height: 44px;
+            padding: 0 13px 0 36px;
+            outline: none;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text);
+            background: #fff;
+            transition: .2s ease;
+        }
+
+        .edit-section input::placeholder {
+            color: #b1b3bd;
+        }
+
+        .edit-section input:focus {
+            border-color: #ffb29f;
+            box-shadow: 0 0 0 4px rgba(255,115,86,.10);
+        }
+
+        .join-btn {
+            width: 100%;
+            height: 45px;
+            margin-top: 2px;
+            border: 0;
+            border-radius: 12px;
+            color: #fff;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent), #ff8467);
+            box-shadow: 0 10px 20px rgba(255,115,86,.20);
+            transition: transform .18s ease, box-shadow .18s ease;
+        }
+
+        .join-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 14px 24px rgba(255,115,86,.25);
+        }
+
+        .join-btn:active {
+            transform: translateY(0);
+        }
+
+        .sidebar-tip {
+            margin-top: auto;
+            padding: 14px;
+            border-radius: 15px;
+            background: #fafafa;
+            border: 1px solid var(--border);
+        }
+
+        .tip-title {
+            color: #4b4e58;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .tip-text {
+            margin-top: 4px;
+            color: var(--muted);
+            line-height: 1.45;
+            font-size: 11px;
+        }
+
+        .footer {
+            margin-top: 12px;
+            text-align: center;
+            color: #b0b2bb;
+            font-size: 10px;
+        }
+
+        /* ================= CHAT ================= */
+
+        .chat {
+            min-width: 0;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #fff;
+        }
+
+        .chat-header {
+            min-height: 88px;
+            padding: 18px 28px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(255,255,255,.92);
+        }
+
+        .room-header {
+            display: flex;
+            align-items: center;
+            gap: 13px;
+            min-width: 0;
+        }
+
+        .header-icon {
+            width: 46px;
+            height: 46px;
+            flex-shrink: 0;
+            display: grid;
+            place-items: center;
+            border-radius: 14px;
+            color: #ff6e51;
+            font-weight: 800;
+            background: var(--accent-soft);
+            border: 1px solid #ffddd4;
+        }
+
+        .room-header h2 {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-family: "Plus Jakarta Sans", sans-serif;
+            font-size: 17px;
+            font-weight: 750;
+            letter-spacing: -.25px;
+        }
+
+        .room-header p {
+            margin-top: 3px;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .connection {
+            display: inline-flex;
+            align-items: center;
+            flex-shrink: 0;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            color: #8b8e99;
+            background: #fafafa;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .connection-dot {
+            width: 7px;
+            height: 7px;
+            margin-right: 7px;
+            border-radius: 50%;
+            background: #ef7a72;
+            box-shadow: 0 0 0 4px rgba(239,122,114,.10);
+        }
+
+        .connected {
+            color: #239a6d;
+            border-color: #d7f1e5;
+            background: #f4fcf8;
+        }
+
+        .connected .connection-dot {
+            background: var(--green);
+            box-shadow: 0 0 0 4px rgba(37,180,123,.11);
+        }
+
+        /* ================= MESSAGES ================= */
+
+        #messages {
+            position: relative;
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            padding: 26px 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            background:
+                radial-gradient(circle at 50% -20%, rgba(255,237,230,.70), transparent 35%),
+                #fff;
+        }
+
+        #messages::-webkit-scrollbar {
+            width: 7px;
+        }
+
+        #messages::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        #messages::-webkit-scrollbar-thumb {
+            border-radius: 10px;
+            background: #e2e2e8;
+        }
+
+        .welcome {
+            width: min(440px, 100%);
+            margin: auto;
+            padding: 30px 22px;
+            text-align: center;
+        }
+
+        .welcome-icon {
+            width: 72px;
+            height: 72px;
+            display: grid;
+            place-items: center;
+            margin: 0 auto 18px;
+            border-radius: 22px;
+            font-size: 30px;
+            background:
+                linear-gradient(145deg, #fff0eb, #fff8f5);
+            border: 1px solid #ffddd4;
+            box-shadow: 0 16px 30px rgba(255,115,86,.10);
+        }
+
+        .welcome h2 {
+            font-family: "Plus Jakarta Sans", sans-serif;
+            font-size: 21px;
+            letter-spacing: -.4px;
+        }
+
+        .welcome p {
+            max-width: 390px;
+            margin: 10px auto 0;
+            color: var(--muted);
+            line-height: 1.6;
+            font-size: 13px;
+        }
+
+        .message {
+            width: fit-content;
+            max-width: min(72%, 640px);
+            padding: 11px 14px;
+            align-self: flex-start;
+            border: 1px solid var(--border);
+            border-radius: 15px 15px 15px 6px;
+            background: #fafafa;
+            box-shadow: 0 5px 18px rgba(20,25,40,.035);
+            animation: messageIn .20s ease-out;
+        }
+
+        .message strong {
+            color: #ef694d;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .message-text {
+            margin-top: 4px;
+            color: #373b45;
+            line-height: 1.48;
+            font-size: 14px;
+            word-break: break-word;
+        }
+
+        .system {
+            max-width: none;
+            align-self: center;
+            padding: 5px 11px;
+            border: 0;
+            border-radius: 999px;
+            color: #a0a2ac;
+            background: #f7f7f9;
+            box-shadow: none;
+            font-size: 11px;
+        }
+
+        @keyframes messageIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ================= INPUT ================= */
+
+        .input-area {
+            padding: 15px 26px 22px;
+            background: #fff;
+        }
+
+        .input-box {
+            max-width: 900px;
+            margin: 0 auto;
+            min-height: 58px;
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            padding: 6px 7px 6px 14px;
+            border: 1px solid var(--border);
+            border-radius: 17px;
+            background: #fafafa;
+            box-shadow: 0 8px 22px rgba(20,25,40,.045);
+            transition: .2s ease;
+        }
+
+        .input-box:focus-within {
+            border-color: #ffb8a7;
+            background: #fff;
+            box-shadow: 0 0 0 4px rgba(255,115,86,.08);
+        }
+
+        #message {
+            flex: 1;
+            min-width: 0;
+            padding: 11px 2px;
+            border: 0;
+            outline: none;
+            color: var(--text);
+            background: transparent;
+            font-size: 14px;
+        }
+
+        #message::placeholder {
+            color: #a9abb5;
+        }
+
+        .send-btn {
+            width: 45px;
+            height: 45px;
+            flex-shrink: 0;
+            display: grid;
+            place-items: center;
+            border: 0;
+            border-radius: 13px;
+            color: #fff;
+            font-size: 17px;
+            background: linear-gradient(145deg, var(--accent), #ff8468);
+            box-shadow: 0 9px 18px rgba(255,115,86,.22);
+            transition: .18s ease;
+        }
+
+        .send-btn:hover {
+            transform: translateY(-1px) scale(1.02);
+            box-shadow: 0 12px 22px rgba(255,115,86,.27);
+        }
+
+        .send-btn:active {
+            transform: scale(.98);
+        }
+
+        /* ================= MOBILE ================= */
+
+        @media (max-width: 920px) {
+            body {
+                padding: 0;
+            }
+
+            .app {
+                width: 100%;
+                height: 100vh;
+                min-height: 0;
+                border: 0;
+                border-radius: 0;
+            }
+
+            .sidebar {
+                width: 270px;
+                flex-basis: 270px;
+            }
+        }
+
+        @media (max-width: 680px) {
+            .sidebar {
+                display: none;
+            }
+
+            .chat-header {
+                min-height: 76px;
+                padding: 14px 16px;
+            }
+
+            .header-icon {
+                width: 42px;
+                height: 42px;
+            }
+
+            .connection {
+                padding: 7px 10px;
+            }
+
+            #messages {
+                padding: 20px 16px;
+            }
+
+            .message {
+                max-width: 88%;
+            }
+
+            .input-area {
+                padding: 10px 12px 14px;
+            }
+
+            .input-box {
+                min-height: 54px;
+                border-radius: 15px;
+                padding-left: 12px;
+            }
+
+            .send-btn {
+                width: 42px;
+                height: 42px;
+            }
+        }
+
+        @media (max-width: 420px) {
+            .room-header p {
+                display: none;
+            }
+
+            .chat-header {
+                gap: 8px;
+            }
+
+            .connection {
+                font-size: 10px;
+            }
+
+            .welcome h2 {
+                font-size: 19px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+<div class="app">
+
+    <aside class="sidebar">
+        <div class="brand">
+            <div class="brand-icon">💬</div>
+            <div>
+                <h1>ChatFlow</h1>
+                <p>Real-time messaging</p>
+            </div>
+        </div>
+
+        <div class="section-title">YOUR PROFILE</div>
+
+        <div class="profile">
+            <div class="profile-top">
+                <div class="avatar" id="avatar">Y</div>
+                <div class="profile-info">
+                    <div class="profile-name" id="displayName">Yuvraj</div>
+                    <div class="online">
+                        <span class="online-dot"></span>
+                        Online
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-title">CURRENT ROOM</div>
+
+        <div class="room-card">
+            <div class="room-icon">#</div>
+            <div class="room-name">Room</div>
+            <div class="room-id" id="displayRoom">102</div>
+            <div class="room-description">Real-time conversation</div>
+        </div>
+
+        <div class="edit-section">
+            <div class="input-wrap">
+                <span>☺</span>
+                <input id="name" type="text" placeholder="Your name" value="Yuvraj" autocomplete="off">
+            </div>
+
+            <div class="input-wrap">
+                <span>#</span>
+                <input id="roomId" type="text" placeholder="Room ID" value="102" autocomplete="off">
+            </div>
+
+            <button class="join-btn" onclick="joinRoom()">Join Room</button>
+        </div>
+
+        <div class="sidebar-tip">
+            <div class="tip-title">💡 Quick tip</div>
+            <div class="tip-text">Choose a name and room ID, then join. Anyone using the same room can chat with you in real time.</div>
+        </div>
+
+        <div class="footer">Powered by WebSocket + STOMP</div>
+    </aside>
+
+    <main class="chat">
+        <header class="chat-header">
+            <div class="room-header">
+                <div class="header-icon">#</div>
+                <div>
+                    <h2 id="headerRoom">Room 102</h2>
+                    <p>Live conversation</p>
+                </div>
+            </div>
+
+            <div class="connection" id="connectionStatus">
+                <span class="connection-dot"></span>
+                <span id="status">Disconnected</span>
+            </div>
+        </header>
+
+        <div id="messages">
+            <div class="welcome" id="welcome">
+                <div class="welcome-icon">💬</div>
+                <h2>Welcome to ChatFlow</h2>
+                <p>Enter your name and room ID, then join a room to start a real-time conversation.</p>
+            </div>
+        </div>
+
+        <div class="input-area">
+            <div class="input-box">
+                <input id="message"
+                       type="text"
+                       placeholder="Write a message..."
+                       autocomplete="off"
+                       onkeydown="handleEnter(event)">
+                <button class="send-btn" aria-label="Send message" onclick="sendMessage()">➤</button>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+
+    let stompClient = null;
+
+    let currentRoomId = null;
+
+    let currentName = null;
+
+
+    /* ================= STATUS ================= */
+
+    function updateStatus(text) {
+
+        document.getElementById("status").innerText = text;
+
+        const connection =
+            document.getElementById("connectionStatus");
+
+        if (text === "Connected") {
+
+            connection.classList.add("connected");
+
+        } else {
+
+            connection.classList.remove("connected");
+
+        }
+    }
+
+
+    /* ================= JOIN ROOM ================= */
+
+    function joinRoom() {
+
+        currentRoomId =
+            document.getElementById("roomId")
+                .value
+                .trim();
+
+        currentName =
+            document.getElementById("name")
+                .value
+                .trim();
+
+
+        if (!currentName) {
+
+            alert("Please enter your name");
+
+            return;
+        }
+
+
+        if (!currentRoomId) {
+
+            alert("Please enter Room ID");
+
+            return;
+        }
+
+
+        /* Update UI */
+
+        document.getElementById("displayName")
+            .innerText = currentName;
+
+
+        document.getElementById("displayRoom")
+            .innerText = currentRoomId;
+
+
+        document.getElementById("headerRoom")
+            .innerText = "Room " + currentRoomId;
+
+
+        document.getElementById("avatar")
+            .innerText =
+            currentName.charAt(0).toUpperCase();
+
+
+        /* Clear old messages */
+
+        document.getElementById("messages").innerHTML = "";
+
+
+        /* Disconnect previous connection */
+
+        if (stompClient) {
+
+            stompClient.deactivate();
+
+        }
+
+
+        /* Create STOMP client */
+
+        stompClient = new StompJs.Client({
+
+            webSocketFactory: () => {
+
+                return new WebSocket(
+                    "ws://localhost:8080/ws"
+                );
+
+            },
+
+            reconnectDelay: 5000,
+
+
+            debug: function (str) {
+
+                console.log(str);
+
+            },
+
+
+            /* CONNECTED */
+
+            onConnect: function () {
+
+                updateStatus("Connected");
+
+
+                const destination =
+                    "/topic/room/" +
+                    currentRoomId;
+
+
+                console.log(
+                    "Subscribed to:",
+                    destination
+                );
+
+
+                stompClient.subscribe(
+
+                    destination,
+
+                    function (message) {
+
+                        const data =
+                            JSON.parse(
+                                message.body
+                            );
+
+
+                        displayMessage(data);
+
+                    }
+
+                );
+
+
+                addSystemMessage(
+                    "Joined Room " +
+                    currentRoomId
+                );
+
+            },
+
+
+            /* STOMP ERROR */
+
+            onStompError: function (frame) {
+
+                console.error(
+                    "STOMP Error:",
+                    frame
+                );
+
+                updateStatus("STOMP Error");
+
+            },
+
+
+            /* WEBSOCKET ERROR */
+
+            onWebSocketError: function (error) {
+
+                console.error(
+                    "WebSocket Error:",
+                    error
+                );
+
+                updateStatus(
+                    "WebSocket Error"
+                );
+
+            },
+
+
+            /* DISCONNECTED */
+
+            onDisconnect: function () {
+
+                updateStatus(
+                    "Disconnected"
+                );
+
+            }
+
+        });
+
+
+        stompClient.activate();
+
+    }
+
+
+    /* ================= SEND ================= */
+
+    function sendMessage() {
+
+        if (
+            !stompClient ||
+            !stompClient.connected
+        ) {
+
+            alert(
+                "Please join a room first"
+            );
+
+            return;
+        }
+
+
+        const messageInput =
+            document.getElementById(
+                "message"
+            );
+
+
+        const messageText =
+            messageInput.value.trim();
+
+
+        if (!messageText) {
+
+            return;
+
+        }
+
+
+        const chatMessage = {
+
+            roomId: currentRoomId,
+
+            name: currentName,
+
+            message: messageText
+
+        };
+
+
+        console.log(
+            "Sending:",
+            chatMessage
+        );
+
+
+        stompClient.publish({
+
+            destination: "/app/chat",
+
+            body: JSON.stringify(
+                chatMessage
+            )
+
+        });
+
+
+        messageInput.value = "";
+
+        messageInput.focus();
+
+    }
+
+
+    /* ================= DISPLAY MESSAGE ================= */
+
+    function displayMessage(data) {
+
+        const messages =
+            document.getElementById(
+                "messages"
+            );
+
+
+        const welcome =
+            document.getElementById(
+                "welcome"
+            );
+
+
+        if (welcome) {
+
+            welcome.remove();
+
+        }
+
+
+        const div =
+            document.createElement("div");
+
+
+        div.className = "message";
+
+
+        const name =
+            document.createElement("strong");
+
+
+        name.innerText =
+            data.name || "Unknown";
+
+
+        const text =
+            document.createElement("div");
+
+
+        text.className = "message-text";
+
+        text.innerText =
+            data.message || "";
+
+
+        div.appendChild(name);
+
+        div.appendChild(text);
+
+        messages.appendChild(div);
+
+
+        messages.scrollTop =
+            messages.scrollHeight;
+
+    }
+
+
+    /* ================= SYSTEM MESSAGE ================= */
+
+    function addSystemMessage(text) {
+
+        const messages =
+            document.getElementById(
+                "messages"
+            );
+
+
+        const div =
+            document.createElement("div");
+
+
+        div.className =
+            "message system";
+
+
+        div.innerText = text;
+
+
+        messages.appendChild(div);
+
+        messages.scrollTop =
+            messages.scrollHeight;
+
+    }
+
+
+    /* ================= ENTER ================= */
+
+    function handleEnter(event) {
+
+        if (event.key === "Enter") {
+
+            sendMessage();
+
+        }
+
+    }
+
+</script>
+
+</body>
+
+
+</html>
